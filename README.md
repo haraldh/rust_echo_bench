@@ -34,4 +34,6 @@ Requests: 40251881
 Responses: 40251872
 ```
 
-A simple rust server can be found at: https://github.com/haraldh/rust_echo_server
+A simple rust echo server can be found at: https://github.com/haraldh/rust_echo_server
+
+This benchmark can also be used to run it against various other echo servers, e.g. those found at https://gist.github.com/idada/9342414
