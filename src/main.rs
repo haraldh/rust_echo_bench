@@ -1,5 +1,6 @@
 use std::thread;
-use std::io::prelude::*;
+use std::io::Read;
+use std::io::Write;
 use std::net::TcpStream;
 use std::time::Duration;
 use std::sync::mpsc;
@@ -14,14 +15,14 @@ const USAGE: &'static str = "
 Echo benchmark.
 
 Usage:
-  ruse_echo_bench [ -a <address> ] [ -l <lenght> ] [ -c <number> ] [ -t <duration> ]
-  ruse_echo_bench (-h | --help)
-  ruse_echo_bench --version
+  echo_bench [ -a <address> ] [ -l <length> ] [ -c <number> ] [ -t <duration> ]
+  echo_bench (-h | --help)
+  echo_bench --version
 
 Options:
   -h, --help                 Show this screen.
   -a, --address <address>    Target echo server address.
-  -l, --lenght <lenght>      Test message length.
+  -l, --length <length>      Test message length.
   -t, --duration <duration>  Test duration in seconds.
   -c, --number <number>      Test connection number.
 ";
