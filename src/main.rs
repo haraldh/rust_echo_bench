@@ -75,7 +75,10 @@ fn main() {
                 }
 
                 match stream.write_all(&out_buf) {
-                    Err(_) => break,
+                    Err(_) => {
+                        println!("Write error!");
+                        break;
+                    }
                     Ok(_) => sum.outb += 1,
                 }
 
@@ -87,6 +90,7 @@ fn main() {
                     Err(_) => break,
                     Ok(m) => {
                         if m == 0 || m != length {
+                            println!("Read error!");
                             break;
                         }
                     }
