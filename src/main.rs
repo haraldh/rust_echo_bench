@@ -1,38 +1,22 @@
-use std::thread;
-use std::io::Read;
-use std::io::Write;
+use std::env;
+use std::io::{Read, Write};
 use std::net::TcpStream;
-use std::time::Duration;
-use std::sync::mpsc;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{mpsc, Arc};
+use std::thread;
+use std::time::Duration;
 
-extern crate rustc_serialize;
-extern crate docopt;
-use docopt::Docopt;
-
-const USAGE: &'static str = "
-Echo benchmark.
+fn print_usage(program: &str, opts: &getopts::Options) {
+    let brief = format!(
+        r#"Echo benchmark.
 
 Usage:
-  echo_bench [ -a <address> ] [ -l <length> ] [ -c <number> ] [ -t <duration> ]
-  echo_bench (-h | --help)
-  echo_bench --version
-
-Options:
-  -h, --help                 Show this screen.
-  -a, --address <address>    Target echo server address.
-  -l, --length <length>      Test message length.
-  -t, --duration <duration>  Test duration in seconds.
-  -c, --number <number>      Test connection number.
-";
-
-#[derive(RustcDecodable,Debug)]
-struct Args {
-    flag_address: Option<String>,
-    flag_length: Option<usize>,
-    flag_duration: Option<u64>,
-    flag_number: Option<u32>,
+  {program} [ -a <address> ] [ -l <length> ] [ -c <number> ] [ -t <duration> ]
+  {program} (-h | --help)
+  {program} --version"#,
+        program = program
+    );
+    print!("{}", opts.usage(&brief));
 }
 
 struct Count {
@@ -41,15 +25,68 @@ struct Count {
 }
 
 fn main() {
-    let args: Args = Docopt::new(USAGE)
-        .and_then(|d| d.parse())
-        .and_then(|d| d.decode())
-        .unwrap_or_else(|e| e.exit());
+    let args: Vec<_> = env::args().collect();
+    let program = args[0].clone();
 
-    let length = args.flag_length.unwrap_or(26);
-    let address = args.flag_address.unwrap_or("127.0.0.1:12345".to_string());
-    let duration = args.flag_duration.unwrap_or(60);
-    let number = args.flag_number.unwrap_or(50);
+    let mut opts = getopts::Options::new();
+    opts.optflag("h", "help", "Print this help.");
+    opts.optopt(
+        "a",
+        "address",
+        "Target echo server address. Default: 127.0.0.1:12345",
+        "<address>",
+    );
+    opts.optopt(
+        "l",
+        "length",
+        "Test message length. Default: 512",
+        "<length>",
+    );
+    opts.optopt(
+        "t",
+        "duration",
+        "Test duration in seconds. Default: 60",
+        "<duration>",
+    );
+    opts.optopt(
+        "c",
+        "number",
+        "Test connection number. Default: 50",
+        "<number>",
+    );
+
+    let matches = match opts.parse(&args[1..]) {
+        Ok(m) => m,
+        Err(f) => {
+            eprintln!("{}", f.to_string());
+            print_usage(&program, &opts);
+            return;
+        }
+    };
+
+    if matches.opt_present("h") {
+        print_usage(&program, &opts);
+        return;
+    }
+
+    let length = matches
+        .opt_str("length")
+        .unwrap_or_default()
+        .parse::<usize>()
+        .unwrap_or(512);
+    let duration = matches
+        .opt_str("duration")
+        .unwrap_or_default()
+        .parse::<u64>()
+        .unwrap_or(60);
+    let number = matches
+        .opt_str("number")
+        .unwrap_or_default()
+        .parse::<u32>()
+        .unwrap_or(50);
+    let address = matches
+        .opt_str("address")
+        .unwrap_or_else(|| "127.0.0.1:12345".to_string());
 
     let (tx, rx) = mpsc::channel();
 
@@ -60,7 +97,7 @@ fn main() {
         let tx = tx.clone();
         let address = address.clone();
         let stop = stop.clone();
-        let length = length.clone();
+        let length = length;
 
         thread::spawn(move || {
             let mut sum = Count { inb: 0, outb: 0 };
@@ -90,7 +127,7 @@ fn main() {
                     Err(_) => break,
                     Ok(m) => {
                         if m == 0 || m != length {
-                            println!("Read error!");
+                            println!("Read error! length={}", m);
                             break;
                         }
                     }
@@ -115,14 +152,16 @@ fn main() {
         sum.outb += c.outb;
     }
     println!("Benchmarking: {}", address);
-    println!("{} clients, running {} bytes, {} sec.",
-             number,
-             length,
-             duration);
-    println!("");
-    println!("Speed: {} request/sec, {} response/sec",
-             sum.outb / duration,
-             sum.inb / duration);
+    println!(
+        "{} clients, running {} bytes, {} sec.",
+        number, length, duration
+    );
+    println!();
+    println!(
+        "Speed: {} request/sec, {} response/sec",
+        sum.outb / duration,
+        sum.inb / duration
+    );
     println!("Requests: {}", sum.outb);
     println!("Responses: {}", sum.inb);
 }
